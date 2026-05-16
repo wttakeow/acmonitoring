@@ -17,8 +17,10 @@ function App() {
       .then(() => {
         setLiffState('Connected');
         if (liff.isLoggedIn()) {
-          liff.getProfile().then(p => setProfile(p));
-           fetchStatus();
+          liff.getProfile().then(p => {
+  setProfile(p);
+  fetchStatus(); 
+});
         } else {
           // Force login if running in external browser
           liff.login();
@@ -33,15 +35,15 @@ function App() {
    
   }, []);
 
- async function fetchStatus() {
-  try {
-    const res = await fetch(GAS_URL);
-    const data = await res.json();
-    setAcData(data);
-  } catch (err) {
-    console.error('Failed to fetch status', err);
-  }
-}
+  async  function fetchStatus (){
+    try {
+      const res = await fetch(GAS_URL);
+      const data = await res.json();
+      setAcData(data);
+    } catch (err) {
+      console.error('Failed to fetch status', err);
+    }
+  };
 
   const updateAC = async (target, action) => {
     setLoading(true);
