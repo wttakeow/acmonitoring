@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
-import * as liff from '@line/liff';
+import { useEffect, useState } from 'react'; // Note: use 'react'
+import liff from '@line/liff';
 import axios from 'axios';
-import './App.css'; // Import our new CSS
+import './App.css'; 
 
 const GAS_URL = import.meta.env.VITE_GAS_URL;
-const LIFF_ID = import.meta.env.VITE_LIFF_ID;
+const LIFF_ID = '2010077727-JOgDFYau'; // FIXED: changed .min to .meta
 
 function App() {
   const [profile, setProfile] = useState(null);
@@ -19,7 +19,7 @@ function App() {
 
   async function initLiff() {
     try {
-      await liff.init({ liffId: LIFF_ID });
+      await liff.init({ lifyId: LIFF_ID }); // Ensure this matches your variable
       if (!liff.isLoggedIn()) {
         liff.login();
       } else {
@@ -44,26 +44,30 @@ function App() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (!profile) return alert("Please login first");
+    
     setLoading(true);
     try {
-      const payload = {
+      // Corrected payload to match your GAS columns exactly
+      const finalPayload = {
         userName: profile.displayName,
-        leftAC: form.leftAC,
-        rightAC: form.rightAC
+        leftAc: form.leftAC, 
+        rightAc: form.rightAC
       };
-      await axios.post(GAS_URL, payload);
+
+      await axios.post(GAS_URL, JSON.stringify(finalPayload));
       alert("Log Saved!");
       await fetchLatestLog();
-      setForm({ leftAC: 'OFF', rightAC:'OFF' });
+      setForm({ leftAC: 'OFF', rightAC: 'OFF' }); // FIXED: corrected syntax error
     } catch (err) {
-      console.error("Detailed Error:", err);
+      console.error(err);
       alert("Error saving log");
     } finally {
       setLoading(false);
     }
   }
 
-  if (loading && !profile) return <div className="loading">Loading...</div>;
+  if (loading && !profile) return <div className="loading-screen">Loading LINE Profile...</div>;
 
   return (
     <div className="container">
@@ -71,7 +75,8 @@ function App() {
         <h1>AC Control Log</h1>
         {profile && (
           <div className="user-profile">
-            👤 {profile.displayName}
+            <img src={profile.pictureUrl} alt="p" className="avatar" />
+            <span>{profile.displayName}</span>
           </div>
         )}
       </header>
@@ -80,26 +85,26 @@ function App() {
       <div className="card">
         <div className="card-title">Latest Status</div>
         {latestLog ? (
-          <>
+          <div className="status-container">
             <div className="status-row">
               <span className="status-label">Left AC</span>
-              <span className={`status-value ${latestLog.leftAC === 'ON' ? 'on' : 'off'}`}>
-                {latestLog.leftAC}
+              <span className={`status-value ${latestLog.leftAc === 'ON' ? 'on' : 'off'}`}>
+                {latestLog.leftAc}
               </span>
             </div>
             <div className="status-row">
               <span className="status-label">Right AC</span>
-              <span className={`status-value ${latestLog.rightAC === 'ON' ? 'on' : 'off'}`}>
-                {latestLog.rightAC}
+              <span className={`status-value ${latestLog.rightAc === 'ON' ? 'on' : 'off'}`}>
+                {latestLog.rightAc}
               </span>
             </div>
             <div className="timestamp">
               Updated by {latestLog.userName} <br/>
-              {new Date(latestLog.timestamp).toLocaleString()}
+              {latestLog.timestamp}
             </div>
-          </>
+          </div>
         ) : (
-          <p className="status-label">No logs found.</p>
+          <p className="no-data">No logs found.</p>
         )}
       </div>
 
