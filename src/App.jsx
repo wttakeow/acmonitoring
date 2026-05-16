@@ -1,146 +1,129 @@
-import { useEffect, useState } from 'react'; // Note: use 'react'
+import { useEffect, useState } from 'react';
 import liff from '@line/liff';
-import axios from 'axios';
-import './App.css'; 
-
-const GAS_URL = import.meta.env.VITE_GAS_URL;
-const LIFF_ID = import.meta.env.VITE_LIFF_ID; // FIXED: changed .min to .meta
+import './App.css';
 
 function App() {
+  const [liffState, setLiffState] = useState('Initializing...');
   const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [latestLog, setLatestLog] = useState(null);
-  const [form, setForm] = useState({ leftAC: 'OFF', rightAC: 'OFF' });
+  const [acData, setAcData] = useState({ left: null, right: null });
+  const [loading, setLoading] = useState(false);
+
+  const GAS_URL = import.meta.env.VITE_GAS_URL;
+  const LIFF_ID = import.meta.env.VITE_LIFF_ID;
 
   useEffect(() => {
-    initLiff();
-    fetchLatestLog();
+    // 1. Initialize LIFF
+    liff.init({ liffId: LIFF_ID })
+      .then(() => {
+        setLiffState('Connected');
+        if (liff.isLoggedIn()) {
+          liff.getProfile().then(p => setProfile(p));
+           fetchStatus();
+        } else {
+          // Force login if running in external browser
+          liff.login();
+        }
+      })
+      .catch((err) => {
+        console.error('LIFF Init Error:', err);
+        setLiffState('Connection Failed');
+      });
+
+    // 2. Fetch Initial AC Status
+   
   }, []);
 
-  async function initLiff() {
-    try {
-      console.log(LIFF_ID);
-      await liff.init({ liffId: LIFF_ID }); // Ensure this matches your variable
-      if (!liff.isLoggedIn()) {
-        liff.login();
-      } else {
-        const userProfile = await liff.getProfile();
-        setProfile(userProfile);
-      }
-    } catch (err) {
-      console.error("LIFF Error", err);
-    } finally {
-      setLoading(false);
-    }
+ async function fetchStatus() {
+  try {
+    const res = await fetch(GAS_URL);
+    const data = await res.json();
+    setAcData(data);
+  } catch (err) {
+    console.error('Failed to fetch status', err);
   }
+}
 
-  async function fetchLatestLog() {
-    try {
-      const res = await axios.get(GAS_URL);
-      setLatestLog(res.data);
-    } catch (err) {
-      console.error("Fetch Error", err);
-    }
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!profile) return alert("Please login first");
-    
+  const updateAC = async (target, action) => {
     setLoading(true);
-    try {
-      // Corrected payload to match your GAS columns exactly
-      const finalPayload = {
-        userName: profile.displayName,
-        leftAc: form.leftAC, 
-        rightAc: form.rightAC
-      };
+    // Use system clock for the timestamp
+    const timestamp = new Date().toLocaleString(); 
+    const userName = profile ? profile.displayName : 'Unknown User';
 
-      await axios.post(GAS_URL, JSON.stringify(finalPayload));
-      alert("Log Saved!");
-      await fetchLatestLog();
-      setForm({ leftAC: 'OFF', rightAC: 'OFF' }); // FIXED: corrected syntax error
+    const payload = { target, action, user: userName, timestamp };
+
+    try {
+      // Send as plain text string to bypass GAS CORS preflight
+      await fetch(GAS_URL, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      await fetchStatus(); // Refresh status after update
     } catch (err) {
-      console.error(err);
-      alert("Error saving log");
+      console.error('Failed to update log', err);
     } finally {
       setLoading(false);
     }
-  }
-
-  if (loading && !profile) return <div className="loading-screen">Loading LINE Profile...</div>;
+  };
 
   return (
     <div className="container">
-      <header>
+      <header className="header">
         <h1>AC Control Log</h1>
-        {profile && (
-          <div className="user-profile">
-            <img src={profile.pictureUrl} alt="p" className="avatar" />
-            <span>{profile.displayName}</span>
-          </div>
-        )}
+        <div className={`status-badge ${liffState === 'Connected' ? 'success' : 'error'}`}>
+          LIFF Status: {liffState}
+        </div>
       </header>
 
-      {/* Status Card */}
-      <div className="card">
-        <div className="card-title">Latest Status</div>
-        {latestLog ? (
-          <div className="status-container">
-            <div className="status-row">
-              <span className="status-label">Left AC</span>
-              <span className={`status-value ${latestLog.leftAc === 'ON' ? 'on' : 'off'}`}>
-                {latestLog.leftAc}
-              </span>
-            </div>
-            <div className="status-row">
-              <span className="status-label">Right AC</span>
-              <span className={`status-value ${latestLog.rightAc === 'ON' ? 'on' : 'off'}`}>
-                {latestLog.rightAc}
-              </span>
-            </div>
-            <div className="timestamp">
-              Updated by {latestLog.userName} <br/>
-              {latestLog.timestamp}
-            </div>
-          </div>
-        ) : (
-          <p className="no-data">No logs found.</p>
-        )}
+      <div className="profile-section">
+        <h3>User Account</h3>
+        <p>{profile ? profile.displayName : 'Loading profile...'}</p>
       </div>
 
-      {/* Action Card */}
-      <div className="card">
-        <form onSubmit={handleSubmit}>
-          <div className="card-title">Update Units</div>
-          <div className="toggle-group">
-            <div className="toggle-item">
-              <p>Left</p>
-              <button
-                type="button"
-                className={`toggle-btn ${form.leftAC === 'ON' ? 'active' : 'inactive'}`}
-                onClick={() => setForm({...form, leftAC: form.leftAC === 'ON' ? 'OFF' : 'ON'})}
-              >
-                {form.leftAC}
-              </button>
-            </div>
+      <div className="status-grid">
+        <div className="status-card">
+          <h3>Left AC</h3>
+          {acData.left ? (
+            <ul>
+              <li><strong>Status:</strong> {acData.left.status}</li>
+              <li><strong>By:</strong> {acData.left.user}</li>
+              <li><strong>Time:</strong> {acData.left.time}</li>
+            </ul>
+          ) : <p>Loading...</p>}
+        </div>
 
-            <div className="toggle-item">
-              <p>Right</p>
-              <button
-                type="button"
-                className={`toggle-btn ${form.rightAC === 'ON' ? 'active' : 'inactive'}`}
-                onClick={() => setForm({...form, rightAC: form.rightAC === 'ON' ? 'OFF' : 'ON'})}
-              >
-                {form.rightAC}
-              </button>
-            </div>
+        <div className="status-card">
+          <h3>Right AC</h3>
+          {acData.right ? (
+            <ul>
+              <li><strong>Status:</strong> {acData.right.status}</li>
+              <li><strong>By:</strong> {acData.right.user}</li>
+              <li><strong>Time:</strong> {acData.right.time}</li>
+            </ul>
+          ) : <p>Loading...</p>}
+        </div>
+      </div>
+
+      <div className="control-panel">
+        <h3>Update Status Log</h3>
+        <div className="button-group">
+          <div className="control-column">
+            <h4>Left</h4>
+            <button className="btn btn-on" disabled={loading} onClick={() => updateAC('LEFT', 'ON')}>Turn ON</button>
+            <button className="btn btn-off" disabled={loading} onClick={() => updateAC('LEFT', 'OFF')}>Turn OFF</button>
+          </div>
+          
+          <div className="control-column">
+            <h4>Both</h4>
+            <button className="btn btn-on" disabled={loading} onClick={() => updateAC('BOTH', 'ON')}>Turn ON</button>
+            <button className="btn btn-off" disabled={loading} onClick={() => updateAC('BOTH', 'OFF')}>Turn OFF</button>
           </div>
 
-          <button type="submit" className="submit-btn" disabled={loading}>
-            {loading ? "Processing..." : "Submit Changes"}
-          </button>
-        </form>
+          <div className="control-column">
+            <h4>Right</h4>
+            <button className="btn btn-on" disabled={loading} onClick={() => updateAC('RIGHT', 'ON')}>Turn ON</button>
+            <button className="btn btn-off" disabled={loading} onClick={() => updateAC('RIGHT', 'OFF')}>Turn OFF</button>
+          </div>
+        </div>
       </div>
     </div>
   );
