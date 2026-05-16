@@ -3,7 +3,8 @@ import liff from '@line/liff';
 import axios from 'axios';
 import './App.css'; 
 
-const GAS_URL = import.meta.env.VITE_GAS_URL; // FIXED: changed .min to .meta
+const GAS_URL = import.meta.env.VITE_GAS_URL;
+const LIFF_ID = import.meta.env.VITE_LIFF_ID; // FIXED: changed .min to .meta
 
 function App() {
   const [profile, setProfile] = useState(null);
@@ -18,7 +19,7 @@ function App() {
 
   async function initLiff() {
     try {
-      await liff.init({ lifyId: '2010077727-JOgDFYau' }); // Ensure this matches your variable
+      await liff.init({ liffId: LIFF_ID }); // Ensure this matches your variable
       if (!liff.isLoggedIn()) {
         liff.login();
       } else {
