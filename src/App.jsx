@@ -19,6 +19,7 @@ function App() {
 
   async function initLiff() {
     try {
+      console.log(LIFF_ID);
       await liff.init({ liffId: LIFF_ID }); // Ensure this matches your variable
       if (!liff.isLoggedIn()) {
         liff.login();
